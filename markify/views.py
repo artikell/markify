@@ -3,11 +3,13 @@ from django.http import HttpResponse
 from django.http import JsonResponse
 from django.conf import settings
 from jinja2 import Template
+from jsonpath_rw import jsonpath, parse
 
 import markdown
 import os
 import re
 import shlex
+import json
 
 from markify.plugins import pluginsAdapter
 adapterList=[
@@ -31,12 +33,15 @@ def create_property(request, path_info):
         for setting in dir(settings)
         if setting.isupper()
     }
+    parsed_query = {}
+    for key, value in request.GET.items():
+        parsed_query[key] = value
 
     request_data = {
         'method': request.method,
         'path': request.path,
         'path_info': path_info,
-        'params': dict(request.GET),
+        'params': parsed_query,
         'data': dict(request.POST),
     }
 
@@ -63,16 +68,24 @@ def extract_shebang(content):
     updated_content = ''.join(updated_lines)
     return shebang_lines, updated_content
 
-def execute_class_by_shebang(tag, args, data):
+def execute_class_by_shebang(tag, json_path, args, data):
     method_name = "Run"
     tag_name = "tag"
-
     for cls in adapterList:
         if hasattr(cls, tag_name) and getattr(cls, tag_name) != tag:
             continue
         if hasattr(cls, method_name) and callable(getattr(cls, method_name)):
-            data = getattr(cls, method_name)(data=data, args=args)
+            ret = getattr(cls, method_name)(data=data, args=args)
+            return ret
     return data
+
+def extract_tag_json_path(string):
+    pattern = r"(.*)\((.*?)\)$"  # 匹配以 ")" 结尾的括号中的内容，并获取括号前面的信息（如果存在的话）
+    match = re.search(pattern, string)
+    if match:
+        return match.group(1), match.group(2)
+    else:
+        return string, None
 
 def execute_shebang(shebang_lines, property):
     
@@ -85,7 +98,9 @@ def execute_shebang(shebang_lines, property):
         shebang_line = re.sub(r'\s+', ' ', shebang_line)
         shebang_parts = shebang_line.split(' ', 1)
         shebang_args = []
-        shebang_tag = shebang_parts[0]
+        shebang_tag, json_path = extract_tag_json_path(shebang_parts[0])
+        if json_path == None:
+            json_path = "$"
         
         if len(shebang_parts) > 1:
             lexer = shlex.shlex(shebang_parts[-1], posix=True)
@@ -98,7 +113,7 @@ def execute_shebang(shebang_lines, property):
             template = Template(shebang_args[i])
             shebang_args[i] = template.render(__property=property, __data=ret)
 
-        ret = execute_class_by_shebang(tag=shebang_tag, args=shebang_args, data=ret)
+        ret = execute_class_by_shebang(tag=shebang_tag, json_path=json_path, args=shebang_args, data=ret)
     return ret
 
 def execute_markdown_path(path_info, property):
@@ -119,7 +134,10 @@ def render_page(request, path_info):
     json_data, content = execute_markdown_path(path_info=path_info, property=property)
 
     template = Template(content)
-    return HttpResponse(markdown.markdown(template.render(__property=property, __data=json_data)))
+    return HttpResponse(markdown.markdown(template.render(__property=property, __data=json_data)
+                            ,extensions=['markdown.extensions.toc',
+                                         'markdown.extensions.fenced_code',
+                                         'markdown.extensions.tables']))
 
 def render_json(request, path_info):
     property = create_property(request=request, path_info=path_info)
