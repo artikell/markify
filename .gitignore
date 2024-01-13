@@ -1,0 +1,28 @@
+# 忽略 Python 编译文件
+*.pyc
+__pycache__/
+
+# 忽略编辑器和集成开发环境（IDE）生成的文件和目录
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 忽略依赖包目录
+venv/
+env/
+env.bak/
+
+# 忽略日志文件
+*.log
+
+# 忽略临时文件
+*.tmp
+
+# 忽略敏感信息的配置文件
+config.ini
+secrets.yaml
+
+# 忽略生成的文档和文档目录
+docs/
+*.pdf

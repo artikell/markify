@@ -1,5 +1,5 @@
 import requests
-
+from urllib.parse import urlparse, parse_qs, parse_qsl
 
 class parameterAdapter:
     tag = "tag"
@@ -15,17 +15,18 @@ class parameterAdapter:
         return data
 
 class requestAdapter:
-    tag = "request"
+    tag = "GET-request"
     @staticmethod
     def Run(data, args):
-        if len(args) < 1:
+        if len(args) < 2:
             return data
-        url = args[1]
-        response = requests.get(url)
+
+        url, params_str = args
+        params = parse_qs(params_str)
+        response = requests.get(url, params=params)
         response_dict = []
-        # 检查响应状态码
+
         if response.status_code == 200:
-            # 解析 JSON 响应为字典
             response_dict = response.json()
         else:
             print("请求失败，状态码:", response.status_code)

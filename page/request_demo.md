@@ -1,4 +1,4 @@
-#!request https://api.uomg.com/api/icp?domain=qrpay.uomg.com
+#!GET-request https://api.uomg.com/api/icp 'domain={{ __property.request.params.domain }}'
 
 ## 当前域名备案状态
 
